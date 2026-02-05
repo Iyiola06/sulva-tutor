@@ -1,0 +1,7 @@
+{
+  "name": "Sulva-Tutor AI",
+  "description": "An intelligent study companion that generates quizzes from your notes and grades handwritten answers using advanced AI.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
