@@ -106,7 +106,7 @@ export const gradeHandwrittenAnswer = async (
 
   // Complex reasoning tasks (handwriting OCR + theory evaluation) use gemini-3-pro-preview
   const response = await ai.models.generateContent({
-    model: "gemini-3-pro-preview",
+    model: "gemini-3-flash-preview",
     contents: {
       parts: [
         {
