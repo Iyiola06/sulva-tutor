@@ -3,14 +3,18 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Sulva-Tutor AI</title>
-  <meta name="theme-color" content="#4f46e5">
-  <meta name="description" content="AI-powered study companion with handwritten grading.">
+  <meta name="theme-color" content="#800080">
+  <meta name="description" content="AI-powered study companion with handwritten grading. Generate quizzes from notes and get instant feedback.">
+  
+  <!-- PWA Meta Tags -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="SulvaTutor">
+  <meta name="application-name" content="SulvaTutor AI">
+  
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3135/3135810.png">
   
@@ -23,14 +27,52 @@
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     
-    /* PWA Safe Area Insets for modern mobile displays */
+    :root {
+      --brand-purple: #800080;
+      --brand-purple-light: #fdf4ff;
+    }
+
+    /* PWA Safe Area Insets */
     body {
       padding-top: env(safe-area-inset-top);
       padding-bottom: env(safe-area-inset-bottom);
       padding-left: env(safe-area-inset-left);
       padding-right: env(safe-area-inset-right);
+      background-color: #fafafa;
+    }
+
+    /* Custom scrollbar for theoretical answers */
+    textarea::-webkit-scrollbar {
+      width: 6px;
+    }
+    textarea::-webkit-scrollbar-thumb {
+      background-color: #e2e8f0;
+      border-radius: 10px;
     }
   </style>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              DEFAULT: '#800080',
+              50: '#fdf4ff',
+              100: '#fae8ff',
+              200: '#f5d0fe',
+              300: '#f0abfc',
+              400: '#e879f9',
+              500: '#d946ef',
+              600: '#800080', // Logo Purple
+              700: '#700070',
+              800: '#5c005c',
+              900: '#4a004a',
+            }
+          }
+        }
+      }
+    }
+  </script>
 <script type="importmap">
 {
   "imports": {

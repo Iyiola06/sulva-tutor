@@ -5,7 +5,7 @@ export enum QuizMode {
   THEORY = 'Theory'
 }
 
-export type AppView = 'main' | 'privacy' | 'terms' | 'help';
+export type AppView = 'main' | 'privacy' | 'terms' | 'help' | 'breakdown';
 
 export interface SavedMaterial {
   id: string;
@@ -26,6 +26,21 @@ export interface QuizQuestion {
 export interface Quiz {
   mode: QuizMode;
   questions: QuizQuestion[];
+}
+
+export interface StudyChapter {
+  title: string;
+  keyPoints?: { title: string; content: string }[];
+  mnemonic?: { acronym: string; phrase: string; description: string };
+  isLoading?: boolean;
+}
+
+export interface StudyBreakdown {
+  summary: string;
+  grandMnemonic?: { acronym: string; full: string };
+  chapters: StudyChapter[];
+  potentialQuestions: { question: string; answerTip: string }[];
+  keyTerms: { term: string; definition: string }[];
 }
 
 export interface GradingResult {

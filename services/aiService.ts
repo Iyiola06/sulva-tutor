@@ -1,17 +1,29 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
-import { QuizMode, Quiz, GradingResult } from "../types";
+import { GoogleGenAI, Type, Modality } from "@google/genai";
+import { QuizMode, Quiz, GradingResult, StudyBreakdown } from "../types";
 
-// Always initialize with apiKey: process.env.API_KEY directly inside service functions
+// Base64 decoder for raw audio data
+function decodeBase64(base64: string): Uint8Array {
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
 export const generateQuiz = async (sourceText: string, mode: QuizMode, count: number): Promise<Quiz> => {
-  // Fix: Use process.env.API_KEY directly in constructor as per guidelines
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const systemInstruction = `
     You are an expert tutor. Create exactly ${count} high-quality questions based on the provided text.
     Mode: ${mode}.
-    Always return valid JSON. 
-    Do not mention your model name or provider in the content.
+    
+    CRITICAL INSTRUCTION FOR MULTIPLE CHOICE:
+    - You MUST randomize the position of the correct answer. 
+    - Ensure an even distribution of correct answer indices (0, 1, 2, and 3). 
+    - Always return valid JSON. 
   `;
 
   const mcqSchema = {
@@ -24,7 +36,7 @@ export const generateQuiz = async (sourceText: string, mode: QuizMode, count: nu
           properties: {
             question: { type: Type.STRING },
             options: { type: Type.ARRAY, items: { type: Type.STRING } },
-            correctAnswer: { type: Type.INTEGER, description: "Index of correct option (0-3)" },
+            correctAnswer: { type: Type.INTEGER },
             explanation: { type: Type.STRING }
           },
           required: ["question", "options", "correctAnswer", "explanation"]
@@ -42,8 +54,8 @@ export const generateQuiz = async (sourceText: string, mode: QuizMode, count: nu
         items: {
           type: Type.OBJECT,
           properties: {
-            question: { type: Type.STRING, description: "Sentence with ___ for the gap" },
-            correctAnswer: { type: Type.STRING, description: "The correct missing word(s)" },
+            question: { type: Type.STRING },
+            correctAnswer: { type: Type.STRING },
             explanation: { type: Type.STRING }
           },
           required: ["question", "correctAnswer", "explanation"]
@@ -62,10 +74,9 @@ export const generateQuiz = async (sourceText: string, mode: QuizMode, count: nu
           type: Type.OBJECT,
           properties: {
             question: { type: Type.STRING },
-            keyConcepts: { type: Type.ARRAY, items: { type: Type.STRING } },
-            explanation: { type: Type.STRING, description: "Model sample answer" }
+            explanation: { type: Type.STRING }
           },
-          required: ["question", "keyConcepts", "explanation"]
+          required: ["question", "explanation"]
         }
       }
     },
@@ -78,10 +89,9 @@ export const generateQuiz = async (sourceText: string, mode: QuizMode, count: nu
     [QuizMode.THEORY]: theorySchema,
   };
 
-  // Basic Text Tasks use gemini-3-flash-preview
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
-    contents: `Material to analyze: ${sourceText.substring(0, 15000)}`,
+    contents: `Material: ${sourceText.substring(0, 15000)}`,
     config: {
       systemInstruction,
       responseMimeType: "application/json",
@@ -89,67 +99,159 @@ export const generateQuiz = async (sourceText: string, mode: QuizMode, count: nu
     },
   });
 
-  const rawData = JSON.parse(response.text || "{}");
-  return {
-    mode,
-    questions: rawData.questions || []
-  };
+  try {
+    const rawData = JSON.parse(response.text || "{}");
+    return { mode, questions: rawData.questions || [] };
+  } catch (e) {
+    return { mode, questions: [] };
+  }
 };
 
-export const gradeHandwrittenAnswer = async (
-  imageBase64: string, 
-  question: string, 
-  context: string
-): Promise<GradingResult> => {
-  // Fix: Initialize GoogleGenAI directly with process.env.API_KEY right before making the call
+export const generateIllustration = async (prompt: string): Promise<string | null> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image',
+      contents: {
+        parts: [{ text: `A clean, professional 3D educational illustration for a student about: ${prompt}. Minimalist background, high contrast, vibrant brand purple accents.` }]
+      },
+      config: {
+        imageConfig: { aspectRatio: "1:1" }
+      }
+    });
 
-  // Complex reasoning tasks (handwriting OCR + theory evaluation) use gemini-3-pro-preview
-  const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: {
-      parts: [
-        {
-          inlineData: {
-            mimeType: "image/jpeg",
-            data: imageBase64.split(',')[1] || imageBase64,
+    for (const part of response.candidates[0].content.parts) {
+      if (part.inlineData) {
+        return `data:image/png;base64,${part.inlineData.data}`;
+      }
+    }
+    return null;
+  } catch (e) {
+    console.error("Image generation failed", e);
+    return null;
+  }
+};
+
+export const generateSpeech = async (text: string): Promise<Uint8Array | null> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash-preview-tts",
+      contents: [{ parts: [{ text: `Read this clearly and supportively: ${text}` }] }],
+      config: {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: 'Kore' },
           },
         },
-        {
-          text: `
-            Analyze this image of a handwritten answer.
-            Reference Material: ${context.substring(0, 5000)}
-            Question: ${question}
-            
-            Tasks:
-            1. Determine if there is actually any handwriting in the image. Set "noHandwritingDetected" to true if the image is blank, blurry, or contains no readable handwritten text.
-            2. If handwriting is found:
-               - Transcribe it.
-               - Assign a score (0-100).
-               - Provide feedback.
-            3. If no handwriting is found:
-               - Set score to 0.
-               - Briefly explain why in the feedback.
-          `
+      },
+    });
+
+    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    if (base64Audio) {
+      return decodeBase64(base64Audio);
+    }
+    return null;
+  } catch (e) {
+    console.error("Speech generation failed", e);
+    return null;
+  }
+};
+
+export const generateStudyBlueprint = async (sourceText: string): Promise<StudyBreakdown> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: `Create a study map for: ${sourceText.substring(0, 10000)}`,
+    config: {
+      systemInstruction: "You are a fast educational mapper and mnemonic expert.",
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          summary: { type: Type.STRING },
+          grandMnemonic: {
+            type: Type.OBJECT,
+            properties: { acronym: { type: Type.STRING }, full: { type: Type.STRING } },
+            required: ["acronym", "full"]
+          },
+          chapters: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { title: { type: Type.STRING } }, required: ["title"] } },
+          potentialQuestions: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { question: { type: Type.STRING }, answerTip: { type: Type.STRING } }, required: ["question", "answerTip"] } },
+          keyTerms: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { term: { type: Type.STRING }, definition: { type: Type.STRING } }, required: ["term", "definition"] } }
         },
-      ],
+        required: ["summary", "chapters", "potentialQuestions", "keyTerms"]
+      } as any,
     },
+  });
+  return JSON.parse(response.text || "{}");
+};
+
+export const generateChapterDetails = async (title: string, text: string): Promise<any> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: `Analyze chapter "${title}" from: ${text.substring(0, 15000)}`,
     config: {
       responseMimeType: "application/json",
       responseSchema: {
         type: Type.OBJECT,
         properties: {
-          ocrText: { type: Type.STRING },
-          score: { type: Type.NUMBER },
-          feedback: { type: Type.STRING },
-          strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
-          weaknesses: { type: Type.ARRAY, items: { type: Type.STRING } },
-          noHandwritingDetected: { type: Type.BOOLEAN }
+          keyPoints: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, content: { type: Type.STRING } }, required: ["title", "content"] } },
+          mnemonic: { type: Type.OBJECT, properties: { acronym: { type: Type.STRING }, phrase: { type: Type.STRING }, description: { type: Type.STRING } }, required: ["acronym", "phrase", "description"] }
         },
-        required: ["ocrText", "score", "feedback", "strengths", "weaknesses", "noHandwritingDetected"]
-      }
-    }
+        required: ["keyPoints"]
+      } as any,
+    },
   });
+  return JSON.parse(response.text || "{}");
+};
 
+export const askFollowUpQuestion = async (userQuestion: string, title: string, content: string, fullText: string, history: any[]): Promise<string> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const chat = ai.chats.create({
+    model: 'gemini-3-flash-preview',
+    config: { systemInstruction: `You are an expert tutor. Chapter: ${title}.` },
+    history: history.map(msg => ({ role: msg.role === 'user' ? 'user' : 'model', parts: [{ text: msg.text }] }))
+  });
+  const response = await chat.sendMessage({ message: `Context: ${content}. Question: ${userQuestion}` });
+  return response.text || "No response received.";
+};
+
+const GRADING_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    ocrText: { type: Type.STRING },
+    score: { type: Type.NUMBER },
+    feedback: { type: Type.STRING },
+    strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
+    weaknesses: { type: Type.ARRAY, items: { type: Type.STRING } },
+    noHandwritingDetected: { type: Type.BOOLEAN }
+  },
+  required: ["ocrText", "score", "feedback", "strengths", "weaknesses", "noHandwritingDetected"]
+};
+
+export const gradeHandwrittenAnswer = async (img: string, q: string, ctx: string): Promise<GradingResult> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: {
+      parts: [
+        { inlineData: { mimeType: "image/jpeg", data: img.includes(',') ? img.split(',')[1] : img } },
+        { text: `Grade handwriting for: "${q}" using context: "${ctx.substring(0, 5000)}"` }
+      ]
+    },
+    config: { responseMimeType: "application/json", responseSchema: GRADING_SCHEMA as any }
+  });
+  return JSON.parse(response.text || "{}");
+};
+
+export const gradeTypedAnswer = async (answer: string, q: string, ctx: string): Promise<GradingResult> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: `Grade this typed answer: "${answer}" for question: "${q}" using context: "${ctx.substring(0, 5000)}"`,
+    config: { responseMimeType: "application/json", responseSchema: GRADING_SCHEMA as any }
+  });
   return JSON.parse(response.text || "{}");
 };

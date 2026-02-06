@@ -7,6 +7,13 @@ interface LayoutProps {
   onNavigate: (view: AppView) => void;
 }
 
+const SulvaLogo = ({ className = "w-8 h-8" }) => (
+  <svg viewBox="0 0 100 100" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M50 50 L85 50 A35 35 0 0 0 50 15 Z" fill="white" />
+    <path d="M50 50 L15 50 A35 35 0 0 0 50 85 Z" fill="white" />
+  </svg>
+);
+
 const Layout: React.FC<LayoutProps> = ({ children, onNavigate }) => {
   const currentYear = new Date().getFullYear();
   const currentDate = new Date().toLocaleDateString('en-US', { 
@@ -17,19 +24,19 @@ const Layout: React.FC<LayoutProps> = ({ children, onNavigate }) => {
   });
 
   return (
-    <div className="min-h-screen flex flex-col font-sans selection:bg-indigo-100 selection:text-indigo-900 overflow-x-hidden">
+    <div className="min-h-screen flex flex-col font-sans selection:bg-brand-100 selection:text-brand-900 overflow-x-hidden">
       <header className="bg-white/90 backdrop-blur-md border-b border-slate-100 py-3 md:py-4 sticky top-0 z-[60] transition-all">
         <div className="container mx-auto px-4 md:px-6 flex justify-between items-center">
           <div 
             onClick={() => onNavigate('main')}
             className="flex items-center space-x-2 md:space-x-3 group cursor-pointer"
           >
-            <div className="w-8 h-8 md:w-10 md:h-10 bg-indigo-600 rounded-lg md:rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200 group-hover:rotate-6 transition-transform">
-              <i className="fas fa-graduation-cap text-base md:text-xl"></i>
+            <div className="w-8 h-8 md:w-10 md:h-10 bg-brand-600 rounded-lg md:rounded-xl flex items-center justify-center text-white shadow-lg shadow-brand-200 group-hover:scale-105 transition-transform">
+              <SulvaLogo className="w-5 h-5 md:w-6 md:h-6" />
             </div>
             <div>
               <h1 className="text-lg md:text-xl font-extrabold text-slate-900 tracking-tight leading-none">
-                Sulva-Tutor <span className="text-indigo-600">AI</span>
+                Sulva-Tutor <span className="text-brand-600">AI</span>
               </h1>
               <p className="text-[8px] md:text-[10px] font-bold text-slate-400 mt-0.5 md:mt-1 uppercase tracking-tighter">
                 {currentDate}
@@ -39,9 +46,9 @@ const Layout: React.FC<LayoutProps> = ({ children, onNavigate }) => {
           <nav className="hidden md:flex items-center space-x-1">
             <button 
               onClick={() => onNavigate('main')}
-              className="px-4 py-2 text-sm font-semibold text-indigo-600 bg-indigo-50 rounded-lg"
+              className="px-4 py-2 text-sm font-semibold text-brand-600 bg-brand-50 rounded-lg hover:bg-brand-100 transition-colors"
             >
-              Study
+              Study Hub
             </button>
           </nav>
         </div>
