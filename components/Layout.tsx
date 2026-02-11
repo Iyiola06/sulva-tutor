@@ -1,6 +1,8 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { AppView } from '../types';
+import { useAuth } from '../contexts/AuthProvider';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -15,19 +17,27 @@ const SulvaLogo = ({ className = "w-8 h-8" }) => (
 );
 
 const Layout: React.FC<LayoutProps> = ({ children, onNavigate }) => {
+  const { user, isPro, usageCount, refreshUsage } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    refreshUsage();
+  }, [location.pathname]);
+
   const currentYear = new Date().getFullYear();
-  const currentDate = new Date().toLocaleDateString('en-US', { 
-    weekday: 'short', 
-    year: 'numeric', 
-    month: 'short', 
-    day: 'numeric' 
+  const currentDate = new Date().toLocaleDateString('en-US', {
+    weekday: 'short',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
   });
 
   return (
     <div className="min-h-screen flex flex-col font-sans selection:bg-brand-100 selection:text-brand-900 overflow-x-hidden">
       <header className="bg-white/90 backdrop-blur-md border-b border-slate-100 py-3 md:py-4 sticky top-0 z-[60] transition-all">
         <div className="container mx-auto px-4 md:px-6 flex justify-between items-center">
-          <div 
+          <div
             onClick={() => onNavigate('main')}
             className="flex items-center space-x-2 md:space-x-3 group cursor-pointer"
           >
@@ -44,7 +54,29 @@ const Layout: React.FC<LayoutProps> = ({ children, onNavigate }) => {
             </div>
           </div>
           <nav className="hidden md:flex items-center space-x-1">
-            <button 
+            {user && (
+              <div className="flex items-center space-x-4 mr-4">
+                <div className="flex flex-col items-end">
+                  <div className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                    {isPro ? <span className="text-brand-600">Pro Plan</span> : <span>Free Plan</span>}
+                  </div>
+                  {!isPro && (
+                    <div className="text-[10px] text-slate-400 font-medium">
+                      {usageCount}/3 Quizzes Used
+                    </div>
+                  )}
+                </div>
+                {!isPro && (
+                  <button
+                    onClick={() => navigate('/pricing')}
+                    className="text-xs font-black bg-brand-600 text-white px-3 py-1.5 rounded-lg hover:bg-brand-700 transition-colors uppercase tracking-wide"
+                  >
+                    Upgrade
+                  </button>
+                )}
+              </div>
+            )}
+            <button
               onClick={() => onNavigate('main')}
               className="px-4 py-2 text-sm font-semibold text-brand-600 bg-brand-50 rounded-lg hover:bg-brand-100 transition-colors"
             >
@@ -53,7 +85,7 @@ const Layout: React.FC<LayoutProps> = ({ children, onNavigate }) => {
           </nav>
         </div>
       </header>
-      
+
       <main className="flex-grow container mx-auto px-4 py-6 md:py-12">
         {children}
       </main>
